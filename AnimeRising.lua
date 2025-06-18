@@ -18,16 +18,42 @@ local Farm = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
-local enemies = { "Kanao", "Nezuko", "Tanjiro", "Zenitsu" }
-local selectedEnemy = enemies[1]
+-- 🗺️ รายชื่อด่านและมอนในแต่ละด่าน
+local stageEnemies = {
+    Solo = { "Cha", "Park", "Sung", "Yung" },
+    OnePiece = { "Luffy", "Nami", "Sanji", "Zoro" },
+    DBZ = { "Piccolo", "Roshi", "SSJGoku", "Vegeta" },
+    DemonSlayer = { "Kanao", "Nezuko", "Tanjiro", "Zenitsu" }
+}
+
+local selectedStage = "Solo"
+local selectedEnemy = stageEnemies[selectedStage][1]
 local isFarming = false
 
--- 🔽 Dropdown เลือกมอนสเตอร์
+-- 🔽 Dropdown เลือกด่าน
+Farm.Main:AddDropdown("SelectStage", {
+    Title = "เลือกด่าน",
+    Values = { "Solo", "OnePiece", "DBZ", "DemonSlayer" },
+    Multi = false,
+    Default = selectedStage,
+    Callback = function(value)
+        selectedStage = value
+        local enemyDropdown = Fluent.Options.SelectEnemy
+        if enemyDropdown then
+            enemyDropdown:SetValues(stageEnemies[selectedStage])
+            selectedEnemy = stageEnemies[selectedStage][1]
+            enemyDropdown:SetValue(selectedEnemy)
+        end
+        print("🌍 เปลี่ยนด่านเป็น:", selectedStage)
+    end
+})
+
+-- 🔽 Dropdown เลือกมอนสเตอร์ (จะเปลี่ยนตามด่าน)
 Farm.Main:AddDropdown("SelectEnemy", {
     Title = "เลือกมอนสเตอร์",
-    Values = enemies,
+    Values = stageEnemies[selectedStage],
     Multi = false,
-    Default = enemies[1],
+    Default = selectedEnemy,
     Callback = function(value)
         selectedEnemy = value
         print("🎯 เป้าหมายเปลี่ยนเป็น:", selectedEnemy)
@@ -37,6 +63,7 @@ Farm.Main:AddDropdown("SelectEnemy", {
 -- ⚔️ ฟังก์ชันโจมตี
 local function Attack(mon)
     print("🗡️ โจมตีมอน:", mon.Name)
+    -- ที่นี่ใส่คำสั่งโจมตีจริง เช่น firetouchinterest หรือ remote
 end
 
 -- 🚀 ฟังก์ชันเทเลพอร์ต
@@ -51,18 +78,16 @@ end
 local function StartFarm()
     task.spawn(function()
         while isFarming do
-            local enemyFolder = workspace:FindFirstChild("Worlds")
-            if enemyFolder then
-                for _, world in ipairs(enemyFolder:GetChildren()) do
-                    if world:FindFirstChild("Enemies") then
-                        for _, mon in ipairs(world.Enemies:GetChildren()) do
-                            if mon.Name == selectedEnemy and mon:FindFirstChild("HumanoidRootPart") then
-                                TP(mon.HumanoidRootPart.CFrame + Vector3.new(0, 0, 2))
-                                Attack(mon)
-                                break
-                            end
+            local worlds = workspace:FindFirstChild("Worlds")
+            if worlds then
+                local stage = worlds:FindFirstChild(selectedStage)
+                if stage and stage:FindFirstChild("Enemies") then
+                    for _, mon in ipairs(stage.Enemies:GetChildren()) do
+                        if mon.Name == selectedEnemy and mon:FindFirstChild("HumanoidRootPart") then
+                            TP(mon.HumanoidRootPart.CFrame + Vector3.new(0, 0, 2))
+                            Attack(mon)
+                            break
                         end
-                        break -- ออกจากลูป world ทันทีเมื่อเจอ enemies
                     end
                 end
             end
@@ -71,64 +96,17 @@ local function StartFarm()
     end)
 end
 
--- ✅ Toggle ฟาร์ม
+-- ✅ Toggle เริ่ม/หยุด AutoFarm
 Farm.Main:AddToggle("ToggleAutoFarm", {
     Title = "เปิด/ปิด AutoFarm",
     Default = false,
     Callback = function(value)
         isFarming = value
         if isFarming then
-            print("✅ เริ่มฟาร์ม:", selectedEnemy)
+            print("✅ เริ่มฟาร์ม:", selectedEnemy, "ที่ด่าน", selectedStage)
             StartFarm()
         else
             print("⛔ หยุดฟาร์ม")
         end
-    end
-})
-
--- 🔍 หา enemies จาก world ปัจจุบัน
-local function GetEnemiesFromCurrentWorld()
-    local foundEnemies = {}
-    local worlds = workspace:FindFirstChild("Worlds")
-    if not worlds then return foundEnemies end
-
-    for _, world in ipairs(worlds:GetChildren()) do
-        if world:FindFirstChild("Enemies") then
-            for _, enemy in ipairs(world.Enemies:GetChildren()) do
-                if enemy:IsA("Model") then
-                    table.insert(foundEnemies, enemy.Name)
-                end
-            end
-            break
-        end
-    end
-    return foundEnemies
-end
-
--- 🔁 ฟังก์ชัน Refresh รายชื่อมอนสเตอร์
-local function RefreshEnemies()
-    local newEnemies = GetEnemiesFromCurrentWorld()
-    if #newEnemies > 0 then
-        enemies = newEnemies
-        selectedEnemy = enemies[1]
-        local dropdown = Fluent:GetDropdown("SelectEnemy")
-        if dropdown then
-            dropdown:SetValues(enemies)
-            dropdown:SetValue(selectedEnemy)
-        else
-            warn("❌ ไม่พบ Dropdown: SelectEnemy")
-        end
-        print("🔄 รีเฟรชมอนเสร็จแล้ว:", table.concat(enemies, ", "))
-    else
-        print("⚠️ ไม่พบมอนใน World ปัจจุบัน")
-    end
-end
-
--- 🔘 ปุ่ม Refresh
-Farm.Main:AddButton("RefreshEnemies", {
-    Title = "🔄 รีเฟรชมอนสเตอร์",
-    Description = "โหลดมอนจากด่านปัจจุบันใหม่",
-    Callback = function()
-        RefreshEnemies()
     end
 })
